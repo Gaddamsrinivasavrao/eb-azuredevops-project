@@ -1,0 +1,4 @@
+e
+1 Right-click the app folder, New File, name it exactly Procfile (no extension - not Procfile.txt).
+2 Paste this single line and save.
+web: gunicorn --bind 127.0.0.1:8000 --workers=1 --threads=15 app:application
