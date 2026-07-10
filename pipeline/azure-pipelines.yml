@@ -1,0 +1,66 @@
+trigger:
+ - main
+pool:
+ vmImage: "ubuntu-latest"
+variables:
+ - group: sentinelops-secrets
+stages:
+ - stage: BuildAndTest
+ displayName: "Build and Test"
+ jobs:
+ - job: RunTests
+ steps:
+ - task: UsePythonVersion@0
+ inputs:
+ versionSpec: "3.11"
+ - script: |
+ cd app
+ pip install -r requirements.txt
+ displayName: "Install app dependencies"
+ - script: |
+ cd app
+ pytest -v | tee ../test_results.txt
+ displayName: "Run unit tests"
+ - task: PublishPipelineArtifact@1
+ inputs:
+ targetPath: "$(System.DefaultWorkingDirectory)/test_results.txt"
+ artifact: "test-results"
+ - stage: AIAgentGate
+ displayName: "AI Agent Review"
+ dependsOn: BuildAndTest
+ jobs:
+ - job: AgentReview
+ steps:
+ - task: DownloadPipelineArtifact@2
+ inputs:
+ artifact: "test-results"
+ path: "$(System.DefaultWorkingDirectory)"
+ - task: UsePythonVersion@0
+ inputs:
+ versionSpec: "3.11"
+ - script: |
+ pip install -r pipeline/requirements.txt
+ displayName: "Install agent dependencies"
+ - script: |
+ python pipeline/agent.py
+ displayName: "Ask AI agent for go/no-go decision"
+ env:
+ GEMINI_API_KEY: $(GEMINI_API_KEY)
+ - stage: DeployToAWS
+ displayName: "Deploy to AWS Elastic Beanstalk"
+ dependsOn: AIAgentGate
+ condition: succeeded()
+ jobs:
+ - job: Deploy
+ steps:
+ - script: |
+ pip install awsebcli --upgrade
+ displayName: "Install EB CLI"
+ - script: |
+ cd app
+ eb init "sentinelops-lite" --platform "Python 3.11" --region $(AWS_REGION)
+ eb deploy sentinelops-env
+ displayName: "Deploy to Elastic Beanstalk"
+ env:
+ AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+ AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
