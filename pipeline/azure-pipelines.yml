@@ -59,7 +59,7 @@ stages:
  - script: |
  cd app
  eb init "sentinelops-lite" --platform "Python 3.11" --region $(AWS_REGION)
- eb deploy sentinelops-env
+ eb deploy Sentinelops-lite-env 
  displayName: "Deploy to Elastic Beanstalk"
  env:
  AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
